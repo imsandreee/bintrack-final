@@ -1,0 +1,239 @@
+/* Custom CSS for BinTrack Landing Page (Poppins, Green/White Theme) */
+
+/* Color Palette:
+   --primary-green: #2ecc71;  // Bright, modern green
+   --dark-green: #27ae60;     // Slightly darker for hover/nav
+   --white: #ffffff;
+   --light-gray: #f8f9fa;
+   --text-secondary: #6c757d;
+*/
+
+:root {
+    --primary-green: #2ecc71;
+    --dark-green: #27ae60;
+    --white: #ffffff;
+    --light-gray: #f8f9fa;
+    --text-secondary: #6c757d;
+    --font-family: 'Poppins', sans-serif;
+}
+
+body {
+    font-family: var(--font-family);
+    line-height: 1.7;
+    color: #212529; /* Near black text for better contrast */
+}
+
+/* Typography and Color Overrides */
+.text-primary {
+    color: var(--primary-green) !important;
+}
+
+.bg-primary {
+    background-color: var(--primary-green) !important;
+}
+
+.text-secondary {
+    color: var(--text-secondary) !important;
+}
+
+.section-heading {
+    font-size: 2.5rem;
+    color: #212529;
+    margin-bottom: 1rem;
+    font-weight: 700;
+}
+
+/* Buttons */
+.btn-primary {
+    background-color: var(--primary-green);
+    border-color: var(--primary-green);
+    font-weight: 600;
+    padding: 0.75rem 2rem;
+    transition: all 0.3s ease;
+}
+
+.btn-primary:hover {
+    background-color: var(--dark-green); 
+    border-color: var(--dark-green);
+    transform: translateY(-2px);
+}
+
+.btn-outline-light {
+    border-color: #fff;
+    color: #fff;
+    font-weight: 600;
+    padding: 0.75rem 2rem;
+    transition: all 0.3s ease;
+}
+
+.btn-outline-light:hover {
+    background-color: rgba(255, 255, 255, 0.15);
+    color: #fff;
+    transform: translateY(-2px);
+}
+
+/* Navigation Bar */
+#mainNav {
+    background-color: var(--dark-green);
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.1);
+}
+
+.navbar-brand {
+    font-weight: 700;
+}
+
+/* New Auth Button Style */
+.btn-nav-auth {
+    background-color: var(--primary-green);
+    color: var(--white);
+    border: 1px solid var(--primary-green);
+    font-weight: 500;
+    padding: 0.375rem 0.75rem;
+    font-size: 0.9rem;
+    transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+.btn-nav-auth:hover {
+    background-color: #23a95c; /* Slightly darker than primary-green */
+    border-color: #23a95c;
+    color: var(--white);
+}
+
+/* Icon Sizing */
+.icon-large {
+    font-size: 3.5rem;
+}
+
+.icon-medium {
+    font-size: 2.5rem;
+}
+
+.icon-xl {
+    font-size: 4.5rem;
+}
+
+/* Hero Section (Masthead) */
+.masthead {
+    height: 100vh;
+    min-height: 600px;
+    padding-top: 5rem;
+    /* Updated Background Image for a greener, smarter look */
+    background: linear-gradient(rgba(46, 204, 113, 0.7), rgba(46, 204, 113, 0.85)), 
+                url('https://images.unsplash.com/photo-1543779698-b80c55452f1e?q=80&w=2000&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D') no-repeat center center;
+    background-size: cover;
+}
+
+.masthead h1 {
+    font-size: clamp(2.5rem, 6vw, 4.5rem); /* Responsive font sizing */
+    letter-spacing: -1px;
+}
+
+.masthead p {
+    max-width: 800px;
+    font-weight: 400;
+    color: #f0f0f0;
+}
+
+/* Features and Team Cards */
+.feature-card, .team-card {
+    border-radius: 1rem;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    border: none;
+    background-color: var(--white);
+    border-bottom: 5px solid var(--primary-green) !important; /* Green stripe on bottom for contrast */
+}
+
+.feature-card:hover, .team-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 1rem 3rem rgba(46, 204, 113, 0.25) !important; /* Greenish shadow on hover */
+}
+
+/* Components Section */
+.component-box {
+    border: 1px solid #e0e0e0;
+    border-radius: 0.75rem;
+    transition: all 0.3s ease;
+    background-color: var(--white);
+}
+
+.component-box:hover {
+    background-color: var(--light-gray); 
+    border-color: var(--primary-green);
+}
+
+/* How It Works Flow - Inverts to White Icons on Green Background */
+.process-flow {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.process-step {
+    flex-basis: 15%;
+    padding: 1rem 0;
+}
+
+.process-arrow {
+    flex-basis: 5%;
+    min-width: 30px;
+    display: none;
+}
+
+@media (min-width: 768px) {
+    .process-arrow {
+        display: flex;
+    }
+}
+
+/* Objectives/Scope/Limitations Section - Now Light Card */
+.card-light {
+    background-color: var(--white);
+    border: 1px solid #e0e0e0;
+    border-radius: 0.75rem;
+    box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.05);
+}
+
+/* Footer - Primary Green */
+footer {
+    background-color: var(--dark-green) !important;
+}
+
+
+
+.auth-card {
+            max-width: 450px;
+            width: 100%;
+            padding: 25px;
+            background-color: white;
+            border-radius: 12px; /* Rounded corners */
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); /* Subtle shadow */
+        }
+        
+        /* Green Theme Primary Color */
+        .theme-green {
+            color: #059669; /* Deep Emerald Green */
+        }
+
+        /* Active Tab Green */
+        .nav-pills .nav-link {
+            border-radius: 8px; /* Rounded pill buttons */
+            transition: all 0.3s;
+        }
+        .nav-pills .nav-link.active {
+            background-color: #059669; /* Green active tab */
+            color: white;
+        }
+        
+        /* Custom Green Button for Login (replacing Bootstrap's blue .btn-primary) */
+        .btn-theme-primary {
+            color: #fff;
+            background-color: #059669; 
+            border-color: #047857;
+        }
+        .btn-theme-primary:hover, .btn-theme-primary:focus {
+            color: #fff;
+            background-color: #047857; /* Slightly darker green on hover */
+            border-color: #047857;
+            box-shadow: 0 0 0 0.25rem rgba(5, 150, 105, 0.5) !important; /* Green focus ring */
+        }

@@ -1,0 +1,148 @@
+:root {
+            /* White and Green Theme */
+            --primary-green: #2ecc71; /* Emerald Green */
+            --dark-green: #27ae60;
+            --light-green: #e9f7ef;
+            --text-dark: #495057; /* Dark Gray for main text */
+            --text-muted: #6c757d;
+            --background-light: #fefefe;
+            
+            --sidebar-width: 280px;
+            --font-family: 'Poppins', sans-serif;
+        }
+
+        body {
+            font-family: var(--font-family);
+            background-color: #f7f7f7;
+            min-height: 100vh;
+            color: var(--text-dark);
+        }
+
+        /* Layout for Desktop: Sidebar + Content */
+        .app-container {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Sidebar Styling - Switched to White/Light Theme */
+        .sidebar {
+            width: var(--sidebar-width);
+            min-width: var(--sidebar-width);
+            background-color: var(--background-light); 
+            color: var(--text-dark);
+            padding: 1.5rem 1rem;
+            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.08);
+            position: sticky;
+            top: 0;
+            overflow-y: auto;
+            z-index: 1000;
+        }
+
+        .sidebar .nav-link {
+            color: var(--text-muted);
+            padding: 0.75rem 1rem;
+            margin-bottom: 0.5rem;
+            border-radius: 0.6rem;
+            transition: all 0.2s;
+            font-weight: 600;
+        }
+
+        .sidebar .nav-link:hover {
+            background-color: var(--light-green);
+            color: var(--dark-green);
+        }
+
+        .sidebar .nav-link.active {
+            background-color: var(--primary-green);
+            color: white; /* White text on green background for contrast */
+            box-shadow: 0 4px 6px rgba(46, 204, 113, 0.3);
+        }
+        
+        .sidebar-header {
+            color: var(--dark-green);
+            font-size: 1.8rem;
+            font-weight: 800;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+        
+        .sidebar-profile-info {
+            color: var(--text-dark);
+        }
+
+        /* Main Content Area */
+        .main-content {
+            flex-grow: 1;
+            padding: 1rem 1.5rem;
+            transition: margin-left 0.3s;
+        }
+
+        /* Custom Card Styling */
+        .custom-card {
+            border: none;
+            border-radius: 1rem;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .custom-card:hover {
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Primary Button Style */
+        .btn-primary {
+            background-color: var(--primary-green);
+            border-color: var(--primary-green);
+            font-weight: 600;
+            border-radius: 0.6rem;
+            transition: background-color 0.3s, transform 0.1s;
+        }
+        .btn-primary:hover, .btn-primary:focus {
+            background-color: var(--dark-green);
+            border-color: var(--dark-green);
+            transform: translateY(-1px);
+        }
+        .btn-outline-primary {
+            border-color: var(--primary-green);
+            color: var(--primary-green);
+            border-radius: 0.6rem;
+        }
+        .btn-outline-primary:hover {
+            background-color: var(--primary-green);
+            color: white;
+        }
+
+        /* Status Colors */
+        .text-green { color: var(--primary-green) !important; }
+        .border-green { border-color: var(--primary-green) !important; }
+        .bg-light-green { background-color: var(--light-green) !important; }
+        .alert-card { border-left: 5px solid #dc3545; }
+        .alert-card.low { border-left: 5px solid #ffc107; }
+
+        /* Progress Bar */
+        .progress-bar-green {
+            background-color: var(--primary-green);
+        }
+
+        /* Table Styling */
+        .table-hover > tbody > tr:hover {
+            background-color: var(--light-green);
+            cursor: pointer;
+        }
+
+        /* Page Content Toggle */
+        .page-content {
+            display: block;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 992px) {
+            .sidebar {
+                display: none; /* Hide standard sidebar on mobile/tablet */
+            }
+            .main-content {
+                padding: 1rem;
+            }
+            .app-container {
+                display: block;
+            }
+        }

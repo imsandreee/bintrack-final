@@ -1,0 +1,100 @@
+:root {
+            --primary-green: #2ecc71; /* Emerald Green */
+            --dark-green: #27ae60;
+            --light-green: #e9f7ef; /* Very light green background */
+            --font-family: 'Poppins', sans-serif; /* Changed to Poppins */
+        }
+
+        body {
+            font-family: var(--font-family);
+            background-color: var(--light-green);
+            min-height: 100vh;
+        }
+
+        /* Custom Card Styling */
+        .custom-card {
+            border: none;
+            border-radius: 1rem;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .custom-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Primary Button Style */
+        .btn-primary {
+            background-color: var(--primary-green);
+            border-color: var(--primary-green);
+            font-weight: 600;
+            border-radius: 0.75rem;
+            transition: background-color 0.3s;
+        }
+        .btn-primary:hover, .btn-primary:focus {
+            background-color: var(--dark-green);
+            border-color: var(--dark-green);
+        }
+        
+        /* Secondary Button Style */
+        .btn-outline-secondary {
+            border-radius: 0.75rem;
+            color: #6c757d;
+            border-color: #dee2e6;
+        }
+        .btn-outline-secondary:hover {
+            color: var(--dark-green);
+            border-color: var(--dark-green);
+            background-color: var(--light-green);
+        }
+
+        /* Typography and Colors */
+        .text-green { color: var(--primary-green) !important; }
+        .bg-light-green { background-color: var(--light-green) !important; }
+
+        /* Navigation */
+        .navbar-logo {
+            font-family: var(--font-family); /* Now relies on the Poppins variable */
+            font-weight: 700;
+            color: var(--dark-green);
+            font-size: 1.5rem;
+        }
+
+        /* Dashboard Indicators */
+        .indicator-card {
+            background: #fff;
+            border-left: 5px solid var(--primary-green);
+            border-radius: 0.75rem;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+            padding: 1rem;
+        }
+        .indicator-card .icon {
+            font-size: 2rem;
+            color: var(--primary-green);
+        }
+
+        /* Fill Level Progress Bar */
+        .progress-bar-fill {
+            background-color: var(--primary-green);
+            transition: width 0.6s ease;
+        }
+
+        /* Status Badges */
+        .badge-nearly-full { background-color: #ffc107; color: #333; }
+        .badge-overflow { background-color: #dc3545; color: #fff; }
+        .badge-normal { background-color: var(--primary-green); color: #fff; }
+        .badge-error { background-color: #6c757d; color: #fff; }
+
+        /* Report Form Styling */
+        .form-control, .form-select {
+            border-radius: 0.5rem;
+        }
+        .form-control:focus, .form-select:focus {
+            border-color: var(--primary-green);
+            box-shadow: 0 0 0 0.2rem rgba(46, 204, 113, 0.25);
+        }
+        
+        /* Utility for Page Switching */
+        .page-content {
+            display: block;
+        }
