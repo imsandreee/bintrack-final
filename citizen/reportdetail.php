@@ -17,7 +17,10 @@ if (!$report_id) {
 }
 
 // Fetch the report belonging only to this user
-$report_data = supabase_fetch("citizen_reports", "?select=*,bin_id(*)&id=eq.$report_id&user_id=eq.$user_id");
+$report_data = supabase_fetch(
+    "citizen_reports",
+    "?select=id,issue_type,description,image_url,status,created_at,updated_at,admin_remarks,bins(bin_code,location_name)&id=eq.$report_id&user_id=eq.$user_id"
+);
 
 // Check if report exists
 if (!is_array($report_data) || count($report_data) === 0) {
@@ -28,7 +31,7 @@ if (!is_array($report_data) || count($report_data) === 0) {
 $report = $report_data[0];
 
 // Bin info (adjust according to your supabase relationship)
-$bin = $report['bin_id'] ?? ['bin_code'=>'N/A','location_name'=>'Unknown'];
+$bin = $report['bins'] ?? ['bin_code'=>'N/A','location_name'=>'Unknown'];
 
 // Image URL
 $image_url = $report['image_url'] ?? null;
@@ -112,10 +115,22 @@ $image_url = $report['image_url'] ?? null;
                     <div class="list-group">
                         <!-- Here you can fetch and display status changes or staff notes if you have a timeline table -->
                         <div class="list-group-item">
-                            <small class="text-muted d-block"><?= date('F j, Y, h:i A', strtotime($report['updated_at'])) ?></small>
-                            <p class="mb-1 fw-semibold text-info">Current Status: <?= ucfirst(str_replace('_',' ',$report['status'])) ?></p>
-                            <small>Staff notes or updates will appear here.</small>
+                            <small class="text-muted d-block">
+                                <?= date('F j, Y, h:i A', strtotime($report['updated_at'])) ?>
+                            </small>
+
+                            <p class="mb-1 fw-semibold text-info">
+                                Status: <?= ucfirst(str_replace('_',' ',$report['status'])) ?>
+                            </p>
+
+                            <small class="text-muted d-block">
+                                <?= !empty($report['admin_remarks']) 
+                                    ? htmlspecialchars($report['admin_remarks']) 
+                                    : 'No official response yet. Please check back later.' 
+                                ?>
+                            </small>
                         </div>
+
                     </div>
                 </div>
             </div>

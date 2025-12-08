@@ -1,0 +1,131 @@
+ /* Import Google Font: Poppins */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
+/* Apply Poppins globally */
+* {
+    font-family: 'Poppins', sans-serif;
+}
+
+ /* Define Green Color Palette */
+        :root {
+            /* Light Mode Variables */
+            --green-primary: #10b981; /* A nice, clean green */
+            --green-dark: #059669;
+            --sidebar-bg: #ffffff;
+            --main-bg: #f5fcf5; /* Off-white with a hint of green */
+            --text-color: #212529;
+            --card-bg: #ffffff;
+            --card-border: #e2f0e6;
+            --link-color: var(--green-dark);
+            --link-hover-bg: #e6f6ec;
+            --header-bg: #ffffff;
+        }
+
+        .dark-mode {
+            /* Dark Mode Variables (Deep Green/Slate) */
+            --sidebar-bg: #163020;
+            --main-bg: #0c1c10;
+            --text-color: #e2e8f0;
+            --card-bg: #1a3c26;
+            --card-border: #2c5a38;
+            --link-color: var(--green-primary);
+            --link-hover-bg: #2c5a38;
+            --header-bg: #163020;
+            --bs-link-color: var(--green-primary);
+        }
+
+        /* General Styles */
+        body {
+            background-color: var(--main-bg);
+            color: var(--text-color);
+            transition: all 0.3s;
+        }
+
+        .sidebar {
+            background-color: var(--sidebar-bg);
+            color: var(--text-color);
+            min-width: 250px;
+            max-width: 250px;
+            transition: all 0.3s;
+            box-shadow: 2px 0 5px rgba(0, 0, 0, 0.05);
+            z-index: 1000;
+        }
+
+        .sidebar .nav-link {
+            color: var(--text-color);
+            padding: 1rem 1.5rem;
+            border-radius: 0.5rem;
+            margin: 0.25rem 0.5rem;
+        }
+
+        .sidebar .nav-link:hover, .sidebar .nav-link.active {
+            background-color: var(--link-hover-bg);
+            color: var(--link-color);
+        }
+
+        .navbar {
+            background-color: var(--header-bg);
+            border-bottom: 1px solid var(--card-border);
+            transition: all 0.3s;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--card-border);
+            transition: all 0.3s;
+            border-radius: 0.75rem;
+        }
+
+        .table {
+            --bs-table-bg: var(--card-bg);
+            --bs-table-color: var(--text-color);
+            --bs-table-border-color: var(--card-border);
+        }
+        
+        .table > :not(caption) > * > * {
+            background-color: var(--card-bg);
+        }
+
+        .table-hover > tbody > tr:hover {
+            --bs-table-bg: var(--link-hover-bg);
+        }
+
+        /* Override Bootstrap Primary color for green theme */
+        .text-bintrack-primary {
+            color: var(--green-dark) !important;
+        }
+        
+        .btn-bintrack-primary {
+            --bs-btn-bg: var(--green-dark);
+            --bs-btn-border-color: var(--green-dark);
+            --bs-btn-hover-bg: var(--green-primary);
+            --bs-btn-hover-border-color: var(--green-primary);
+            --bs-btn-active-bg: var(--green-primary);
+            --bs-btn-active-border-color: var(--green-primary);
+            --bs-btn-color: #ffffff;
+        }
+
+        /* NEW: Map container styling */
+        #binMap {
+            height: 300px;
+            width: 100%;
+            border-radius: 0.5rem;
+            margin-top: 10px;
+            z-index: 0; /* Ensures the map works correctly */
+        }
+
+        /* Responsive adjustments for mobile */
+        @media (max-width: 992px) {
+            .sidebar {
+                position: fixed;
+                left: -250px;
+                height: 100vh;
+                transition: left 0.3s;
+            }
+            .sidebar.show {
+                left: 0;
+            }
+            .main-content {
+                margin-left: 0 !important;
+            }
+        }

@@ -71,7 +71,7 @@ $_SESSION['user'] = [
 // -------------------
 switch ($profile['role']) {
     case 'admin':
-        header("Location: admin.php");
+        header("Location: ../admin/dashboard.php");
         exit;
     case 'collector':
         header("Location: ../collector/dashboard.php");

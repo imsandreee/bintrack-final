@@ -145,7 +145,6 @@ include '../includes/collector/navbar.php';
 
     <!-- Bootstrap 5 JavaScript Bundle -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-       <script src="../assets/js/collector.js"></script>
 
    
 </body>

@@ -10,15 +10,7 @@ if (!isset($_SESSION['user']) || $_SESSION['user']['role'] != 'collector') {
 $user = $_SESSION['user'];
 ?>
 
-<nav class="navbar navbar-expand-lg navbar-light bg-light px-4">
-    <a class="navbar-brand text-success fw-bold" href="#">BinTrack</a>
-    <div class="ms-auto d-flex align-items-center">
-        <span class="me-3">Hello, <?= htmlspecialchars($_SESSION['full_name']); ?> (<?= htmlspecialchars($_SESSION['role']); ?>)</span>
-        <a href="../auth/logout.php" class="btn btn-outline-danger">
-            <i class="bi bi-box-arrow-right me-1"></i> Logout
-        </a>
-    </div>
-</nav>
+
 
 
 
@@ -39,11 +31,14 @@ $user = $_SESSION['user'];
 </head>
 <body>
 
-        <?php
-include '../includes/collector/navbar.php';
-?>
+ 
 
 
+     <?php
+    include '../includes/collector/navbar.php'; // Includes the content of header.php
+    ?>
+
+    
             <div class="container-fluid p-0">
 
                 <!-- ======================================================= -->
@@ -55,8 +50,12 @@ include '../includes/collector/navbar.php';
                     <div class="alert bg-white custom-card p-4 mb-5 border-start border-4 border-green d-flex align-items-center">
                         <i class="bi bi-truck-flatbed fs-2 text-green me-3"></i>
                         <div>
-                            <h4 class="mb-1 fw-bold">Welcome back, John Doe!</h4>
-                            <p class="mb-0 text-muted">Ready to hit your routes? Here's your mission for the day.</p>
+                            <h4 class="mb-1 fw-bold">
+                                Welcome back, <?= htmlspecialchars($user['full_name'] ?? 'Collector') ?>!
+                            </h4>
+                            <p class="mb-0 text-muted">
+                                Ready to hit your routes? Here's your mission for the day.
+                            </p>
                         </div>
                     </div>
 
