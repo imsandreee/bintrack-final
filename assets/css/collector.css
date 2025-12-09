@@ -128,7 +128,6 @@
             background-color: var(--light-green);
             cursor: pointer;
         }
-
         /* Page Content Toggle */
         .page-content {
             display: block;
@@ -146,3 +145,8 @@
                 display: block;
             }
         }
+    /* ... other styles ... */
+    #routeMap {
+        height: 700px; /* Fixed height for a good map view */
+        width: 100%;
+    }

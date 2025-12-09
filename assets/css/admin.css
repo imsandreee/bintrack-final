@@ -129,3 +129,50 @@
                 margin-left: 0 !important;
             }
         }
+
+        /* Add this CSS to your project's stylesheet for visual markers */
+
+/* Base style for custom icon */
+.custom-div-icon {
+    background: none !important;
+    border: none !important;
+    text-align: center;
+    line-height: 1; /* Adjust to center icon vertically */
+}
+
+.custom-div-icon i {
+    font-size: 28px; /* Size of the Bootstrap Icon */
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.5); /* For better visibility */
+}
+
+/* Color definitions based on bin status/fill level */
+.full-icon {
+    color: #dc3545; /* Bootstrap Red (Danger) */
+}
+
+.nearly-full-icon {
+    color: #ffc107; /* Bootstrap Yellow (Warning) */
+}
+
+.active-icon {
+    color: #198754; /* Bootstrap Green (Success) */
+}
+
+.inactive-icon, .default-icon {
+    color: #6c757d; /* Bootstrap Gray (Secondary) */
+}
+
+.maintenance-icon {
+    color: #0dcaf0; /* Bootstrap Cyan (Info) */
+}
+
+/* Optional: Add a simple pulse/animation for urgent bins */
+@keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7); }
+    70% { box-shadow: 0 0 0 10px rgba(220, 53, 69, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); }
+}
+
+.full-bin i {
+    animation: pulse 1.5s infinite;
+}
