@@ -9,8 +9,6 @@ require_once '../auth/config.php';
 session_start();
 
 // --- Supabase Fetch Function (Included here for context/completeness) ---
-// Note: In a production environment, this function should be in an included utility file.
-// This definition is required to make the rest of the script executable.
 if (!function_exists('supabase_fetch')) {
     function supabase_fetch($table, $query = '') {
         // Assuming $SUPABASE_URL and $SUPABASE_KEY are defined in config.php
@@ -61,52 +59,89 @@ if (!$collector_id) {
 $routes_data = [];
 
 // 1️⃣ Fetch all route assignments for this collector
+// UPDATED Query: Target collection_route, adding 'status'
 $assigned_routes = supabase_fetch(
-    "route_assignments",
-    "?collector_id=eq.$collector_id&select=route_id,assigned_at,collection_routes(id,route_name)"
+    "collection_route",
+    "?driver=eq.$collector_id&select=id,route_name,bin_ids,status" // Added 'status'
 );
 
 
 if ($assigned_routes) {
-    foreach ($assigned_routes as $assignment) {
-        $route_id   = $assignment['route_id'];
-        $route_name = htmlspecialchars($assignment['collection_routes']['route_name']);
-
-        // 2️⃣ Fetch total bins for this route
-        // Select all bins assigned to the route, getting only the bin_id
-        $bins_in_route = supabase_fetch("route_bins", "?route_id=eq.$route_id&select=bin_id");
-        $total_bins = count($bins_in_route);
-        $bin_ids = array_column($bins_in_route, 'bin_id');
-
+    foreach ($assigned_routes as $route_details) {
+        // Route info is now directly in the result
+        $route_id   = $route_details['id'];
+        $route_name = htmlspecialchars($route_details['route_name']);
+        $route_status_db = $route_details['status']; // New status field
+        
+        // Bin IDs are retrieved as an array directly from the 'bin_ids' column
+        $bin_ids = $route_details['bin_ids'] ?? [];
+        
+        // Handle potential string representation of array if not decoded properly by PHP/Supabase interaction.
+        if (is_string($bin_ids)) {
+            // This regex strips braces and quotes, then splits by comma
+            $bin_ids = array_map(fn($v) => trim($v, '" '), explode(',', trim($bin_ids, '{}')));
+            $bin_ids = array_filter($bin_ids, fn($v) => !empty($v)); // Remove empty elements
+        }
+        
+        $total_bins = count($bin_ids);
+        
         // 3️⃣ Fetch completed bins (collection logs) by this collector
         $completed_count = 0;
         if (!empty($bin_ids)) {
-            // Check logs for any bin in the list, collected by the current collector
+            // Supabase IN operator requires UUIDs to be surrounded by quotes in the URL query string.
+            $quoted_bin_ids = array_map(fn($id) => '"' . $id . '"', $bin_ids);
+            $bin_id_in_query = implode(",", $quoted_bin_ids);
+
             $completed_logs = supabase_fetch(
                 "collection_logs",
-                // Select only the bin_id, grouped by bin_id, to avoid counting duplicate collections of the same bin
-                // Note: The IN operator syntax in the URL is critical here.
-                "?collector_id=eq.$collector_id&bin_id=in.(" . implode(",", $bin_ids) . ")&select=bin_id&limit=" . $total_bins
+                // bin_id=in.("uuid1","uuid2",...)
+                "?collector_id=eq.$collector_id&bin_id=in.(" . $bin_id_in_query . ")&select=bin_id&limit=" . $total_bins
             );
-            // The logic assumes a bin is 'completed' if any log exists for it within this route context.
-            // A more rigorous check might require filtering logs by assignment date.
+            // We count the number of *unique* bins logged
             $completed_count = count(array_unique(array_column($completed_logs, 'bin_id')));
         } 
 
         // 4️⃣ Compute progress
         $progress = ($total_bins > 0) ? round(($completed_count / $total_bins) * 100) : 0;
 
-        // 5️⃣ Determine status badge
+        // 5️⃣ Determine status badge - UPDATED to check DB status first
         $status_badge = '';
-        if ($total_bins === 0) {
-            $status_badge = "<span class='badge bg-secondary'>No Bins</span>";
-        } elseif ($completed_count == 0) {
-            $status_badge = "<span class='badge bg-danger'>Not Started</span>";
-        } elseif ($completed_count < $total_bins) {
-            $status_badge = "<span class='badge bg-warning text-dark'>In Progress</span>";
-        } else { // $completed_count === $total_bins
-            $status_badge = "<span class='badge bg-success'>Completed</span>";
+        $badge_class = '';
+        
+        // Use DB status for explicit states (Completed, Cancelled, Pending)
+        switch ($route_status_db) {
+            case 'completed':
+                $badge_class = 'bg-success';
+                $status_text = 'Completed';
+                break;
+            case 'cancelled':
+                $badge_class = 'bg-secondary';
+                $status_text = 'Cancelled';
+                break;
+            case 'pending':
+                $badge_class = 'bg-info text-dark';
+                $status_text = 'Pending';
+                break;
+            case 'active':
+            default:
+                // For 'active' or default, use the progress-based logic
+                if ($total_bins === 0) {
+                    $badge_class = 'bg-secondary';
+                    $status_text = 'No Bins';
+                } elseif ($completed_count == 0) {
+                    $badge_class = 'bg-danger';
+                    $status_text = 'Not Started';
+                } elseif ($completed_count < $total_bins) {
+                    $badge_class = 'bg-warning text-dark';
+                    $status_text = 'In Progress';
+                } else { // Progress is 100% but DB status is 'active'
+                    $badge_class = 'bg-success';
+                    $status_text = 'Completed (Unsynced)';
+                }
+                break;
         }
+
+        $status_badge = "<span class='badge {$badge_class}'>{$status_text}</span>";
 
         $routes_data[] = [
             'id' => $route_id,
@@ -114,7 +149,8 @@ if ($assigned_routes) {
             'total_bins' => $total_bins,
             'completed' => $completed_count,
             'progress' => $progress,
-            'status_badge' => $status_badge
+            'status_badge' => $status_badge,
+            'route_status_db' => $route_status_db // Include for potential future use
         ];
     }
 }
@@ -171,7 +207,20 @@ if ($assigned_routes) {
                             <td><?= $route['completed'] ?> / <?= $route['total_bins'] ?></td>
                             <td>
                                 <div class="progress" style="height: 10px;">
-                                    <div class="progress-bar <?= ($route['progress'] == 100) ? 'bg-success' : 'bg-primary' ?>" role="progressbar" 
+                                    <div class="progress-bar 
+                                        <?php 
+                                            // Determine progress bar color based on progress AND DB status
+                                            if ($route['route_status_db'] === 'completed' || $route['progress'] == 100) {
+                                                echo 'bg-success';
+                                            } elseif ($route['route_status_db'] === 'cancelled') {
+                                                echo 'bg-secondary';
+                                            } elseif ($route['route_status_db'] === 'pending' || $route['completed'] == 0) {
+                                                echo 'bg-danger';
+                                            } else {
+                                                echo 'bg-primary';
+                                            }
+                                        ?>" 
+                                        role="progressbar" 
                                         style="width: <?= $route['progress'] ?>%" 
                                         aria-valuenow="<?= $route['progress'] ?>" aria-valuemin="0" aria-valuemax="100">
                                     </div>

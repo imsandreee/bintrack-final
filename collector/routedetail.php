@@ -1,11 +1,8 @@
 <?php
-// collector/routedetail.php
+// D:\xammp\htdocs\project\collector\routedetail.php
 
 // Ensure paths are correct for your structure
 require_once '../auth/config.php';
-// Assumes supabase_fetch() is included via config.php or a dedicated utility file
-// For this script to work, you MUST have the supabase_fetch() function available.
-
 session_start();
 
 // --- Collector and Route Authorization Check ---
@@ -17,76 +14,154 @@ if (!$collector_id || !$route_id) {
     echo "Unauthorized";
     exit;
 }
-
-// 1. Fetch Route Name
-$route_details = supabase_fetch(
-    "collection_routes",
-    "?id=eq.$route_id&select=route_name"
-);
-$route_name = $route_details[0]['route_name'] ?? 'Route Not Found';
-
-
-// 2. Get bins assigned to this route
-$route_bins = supabase_fetch(
-    "route_bins",
-    "?route_id=eq.$route_id&select=bin_id,bins(id,bin_code,location_name,latitude,longitude)"
-);
-
-$bins_data = [];
-
-foreach ($route_bins as $rb) {
-
-    $binId = $rb['bin_id'];
-    $info = $rb['bins'];
-    
-    $lat_lng_string = $info['latitude'] . ',' . $info['longitude'];
-
-    // Latest reading
-    $readings = supabase_fetch(
-        "sensor_readings",
-        "?bin_id=eq.$binId&order=timestamp.desc&limit=1"
-    );
-    $reading = $readings ? $readings[0] : null;
-
-    // Alerts
-    $alerts = supabase_fetch(
-        "bin_alerts",
-        "?bin_id=eq.$binId&resolved=eq.false"
-    );
-
-    // Check if already collected
-    // NOTE: This logic should ideally check if collected TODAY, but we keep the original logic for now.
-    $today_log = supabase_fetch(
-        "collection_logs",
-        "?bin_id=eq.$binId&collector_id=eq.$collector_id&order=collected_at.desc&limit=1"
-    );
-    
-    $is_collected = !empty($today_log);
-    
-    $fill_level_cm = $reading['ultrasonic_distance_cm'] ?? null;
-    // Assuming bin height is 100cm for simplicity in this calculation (100 - distance)
-    $fill_percent = $fill_level_cm !== null ? max(0, 100 - $fill_level_cm) : null; 
-    $fill_color = '';
-    if ($fill_percent !== null) {
-        $fill_color = $fill_percent >= 90 ? 'bg-danger'
-                      : ($fill_percent >= 70 ? 'bg-warning' : 'bg-success');
-    }
-
-    $bins_data[] = [
-        "id" => $info['id'],
-        "code" => $info['bin_code'],
-        "location_name" => $info['location_name'], // Display name
-        "location_coords" => $lat_lng_string,     // Coordinates for map
-        "latitude" => $info['latitude'],
-        "longitude" => $info['longitude'],
-        "fill_percent" => $fill_percent,
-        "fill_color" => $fill_color,
-        "weight" => $reading['load_cell_weight_kg'] ?? null,
-        "alerts" => $alerts,
-        "is_collected" => $is_collected
-    ];
+if (!function_exists('supabase_fetch')) {
+    die("Error: Supabase fetch function is not defined. Check config.php.");
 }
 
+// 1. Fetch Route Details (including status, waypoints, bin_ids, and STARTED_AT)
+$route_details_result = supabase_fetch(
+    "collection_route",
+    "?id=eq.$route_id&select=route_name,bin_ids,status,waypoints,distance,estimated_time,started_at"
+);
+
+// ⭐ Safely determine the route data and handle failure
+$route_data = [];
+if (is_array($route_details_result) && !empty($route_details_result)) {
+    $route_data = $route_details_result[0];
+}
+
+// Check if route data was found before proceeding
+if (empty($route_data)) {
+    http_response_code(404);
+    echo "Route ID $route_id not found or unauthorized.";
+    exit;
+}
+// ⭐ End Fix
+
+$route_name = $route_data['route_name'] ?? 'Route Not Found';
+$bin_ids_array = $route_data['bin_ids'] ?? [];
+$route_status = $route_data['status'] ?? 'pending';
+$route_distance = $route_data['distance'] ?? null;
+$route_time = $route_data['estimated_time'] ?? null;
+$route_started_at = $route_data['started_at'] ?? null; // CAPTURED START TIME
+
+// Initialize bins data array
+$bins_data = [];
+
+// --- CONSTANTS/UTILITIES ---
+// Set these values based on your physical bin measurements:
+define('DISTANCE_WHEN_EMPTY', 30.0); // Ultrasonic reading (cm) when the bin is empty (0% fill)
+define('DISTANCE_WHEN_FULL', 5.0); // Ultrasonic reading (cm) when the bin is considered full (100% fill)
+define('USABLE_RANGE', DISTANCE_WHEN_EMPTY - DISTANCE_WHEN_FULL);
+
+function calculate_fill_percent($distance_cm) {
+    // 1. Handle non-numeric or invalid input
+    if ($distance_cm === null || USABLE_RANGE <= 0) return null;
+
+    // 2. Handle 0% and 100% boundaries
+    if ($distance_cm >= DISTANCE_WHEN_EMPTY) return 0; // Empty or sensor error reading high
+    if ($distance_cm <= DISTANCE_WHEN_FULL) return 100; // Full or sensor error reading low
+
+    // 3. Calculate the distance filled (how much the current reading is below the 'empty' level)
+    $distance_filled = DISTANCE_WHEN_EMPTY - $distance_cm;
+    
+    // 4. Calculate Fill %: (Distance Filled / Total Usable Range) * 100
+    $fill = ($distance_filled / USABLE_RANGE) * 100;
+    
+    // Clamp and round the result
+    return max(0, min(100, round($fill)));
+}
+
+// --- BIN DATA FETCHING ---
+if (!empty($bin_ids_array)) {
+    $bin_ids_list = implode(',', $bin_ids_array);
+    $bin_query = "?id=in.($bin_ids_list)&select=id,bin_code,location_name,latitude,longitude";
+
+    $bins_list_result = supabase_fetch(
+        "bins",
+        $bin_query
+    );
+
+    foreach ($bins_list_result as $bin_info) {
+
+        $binId = $bin_info['id'];
+
+        // --- FETCH LATEST SENSOR READING ---
+        $latest_reading_query = "?bin_id=eq.$binId&order=timestamp.desc&limit=1&select=ultrasonic_distance_cm,load_cell_weight_kg";
+        $reading_result = supabase_fetch("sensor_readings", $latest_reading_query);
+        
+        // ⭐ FIX APPLIED HERE: Safely assign $latest_reading
+        $latest_reading = (is_array($reading_result) && !empty($reading_result)) 
+            ? $reading_result[0] 
+            : ['ultrasonic_distance_cm' => null, 'load_cell_weight_kg' => null];
+        // ⭐ END FIX
+        
+        // --- CALCULATE FILL LEVEL AND COLOR ---
+        // These now safely use the $latest_reading array guaranteed above
+        $distance_cm = $latest_reading['ultrasonic_distance_cm'] ?? null;
+        $weight_kg = $latest_reading['load_cell_weight_kg'] ?? null;
+        
+        $fill_percent = calculate_fill_percent($distance_cm);
+        
+        $fill_color = 'bg-secondary';
+        if ($fill_percent !== null) {
+            if ($fill_percent >= 90) {
+                $fill_color = 'bg-danger';
+            } elseif ($fill_percent >= 70) {
+                $fill_color = 'bg-warning';
+            } else {
+                $fill_color = 'bg-success';
+            }
+        }
+        
+        // Assume alerts are fetched separately or set to empty array for now
+        $alerts = []; // Fetch active alerts here if needed
+
+        // --- CHECK COLLECTION STATUS (IMPROVED LOGIC) ---
+        $is_collected = false;
+        
+        $collected_query = "?bin_id=eq.$binId&collector_id=eq.$collector_id&order=collected_at.desc&limit=1";
+        
+        // IMPROVEMENT: Filter collection logs by route start time if the route is active
+        if ($route_status === 'active' && !empty($route_started_at)) {
+             // Look for logs collected after the route started
+             $route_start_filter = $route_started_at; 
+             $collected_query = "?bin_id=eq.$binId&collector_id=eq.$collector_id&collected_at=gte.$route_start_filter&order=collected_at.desc&limit=1";
+        }
+
+        $latest_log = supabase_fetch("collection_logs", $collected_query);
+        
+        if (!empty($latest_log)) {
+            $log_status = $latest_log[0]['status'] ?? 'collected'; 
+            
+            if ($log_status !== 'skipped') {
+                $collected_timestamp = strtotime($latest_log[0]['collected_at']);
+                
+                if ($route_status === 'pending') {
+                    if (date('Y-m-d', $collected_timestamp) === date('Y-m-d')) {
+                         $is_collected = true;
+                    }
+                } else {
+                    $is_collected = true;
+                }
+            }
+        }
+        
+        $bins_data[] = [
+            "id" => $bin_info['id'],
+            "code" => $bin_info['bin_code'],
+            "location_name" => $bin_info['location_name'],
+            // Removed latitude/longitude since the map is gone
+            "fill_percent" => $fill_percent,
+            "fill_color" => $fill_color,
+            "weight" => $weight_kg, 
+            "alerts" => $alerts,
+            "is_collected" => $is_collected
+        ];
+    }
+}
+$pending_count = count(array_filter($bins_data, fn($b) => !$b['is_collected']));
+$all_collected = $pending_count === 0 && count($bins_data) > 0;
 ?>
 
 <!DOCTYPE html>
@@ -99,61 +174,55 @@ foreach ($route_bins as $rb) {
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="../assets/css/collector.css">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    integrity="sha256-o9N1j8Y+1l3flK8lR5Dd4tGgROk87oZg6M12B9H+0hM=" crossorigin=""/>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-    integrity="sha256-o9N1j8Y+1l3flK8lR5Dd4tGgROk87oZg6M12B9H+0hM=" crossorigin=""></script>
         
     <style>
-        /* Custom styles to ensure map and list scroll independently if needed */
-        #binListContainer {
-            max-height: 700px; /* Adjust height as needed */
-            overflow-y: auto;
-        }
-        #routeMap {
-            height: 700px; /* Fixed height for a good map view */
-            width: 100%;
-        }
-        .bin-list-card {
-            cursor: pointer;
-            transition: background-color 0.2s;
-        }
-        .bin-list-card:hover {
-            background-color: #f8f9fa;
-        }
-        .bin-collected {
-            border-left: 5px solid #198754; /* Green border for collected */
-        }
+        /* Adjust layout since the map column is removed */
+        #binListContainer { max-height: 800px; overflow-y: auto; }
+        .bin-list-card { cursor: pointer; transition: background-color 0.2s; }
+        .bin-list-card:hover { background-color: #f8f9fa; }
+        .bin-collected { border-left: 5px solid #198754; }
+        .status-badge-container .badge { font-size: 0.9em; padding: 0.5em 0.75em; }
     </style>
 </head>
 <body>
 
     <?php include '../includes/collector/navbar.php'; ?>
 
-    <div class="container-fluid p-0">
-
-        <section id="routeDetailsPage" class="page-content">
-            <h1 class="mb-4 fw-bold">Route Details: <span id="routeIdDisplay"><?= htmlspecialchars($route_name) ?></span></h1>
+    <div class="container p-4"> <section id="routeDetailsPage" class="page-content">
+            <h1 class="mb-4 fw-bold">Route: <span id="routeIdDisplay"><?= htmlspecialchars($route_name) ?></span></h1>
             <input type="hidden" id="routeId" value="<?= htmlspecialchars($route_id) ?>">
+            <input type="hidden" id="initialStatus" value="<?= htmlspecialchars($route_status) ?>">
 
-            <?php 
-                $pending_count = count(array_filter($bins_data, fn($b) => !$b['is_collected']));
-            ?>
-            <h5 class="fw-bold mb-3">
-                <i class="bi bi-pin-map me-2"></i> Route Bins Overview 
-                <span class="badge bg-primary ms-2">Total Bins: <?= count($bins_data) ?></span>
-                <span class="badge bg-warning text-dark">Pending: <span id="pendingCount"><?= $pending_count ?></span></span>
-            </h5>
-            
-            <div class="row g-4 mb-4">
-                
-                <div class="col-lg-7">
-                    <div class="custom-card p-2 bg-white shadow-sm">
-                        <div id="routeMap" class="border rounded-3"></div>
-                    </div>
+            <div class="d-flex justify-content-between align-items-center mb-4 p-3 bg-light rounded shadow-sm">
+                <div class="summary-info">
+                    <span class="badge bg-primary me-3">Total Bins: <?= count($bins_data) ?></span>
+                    <span id="pendingBadge" class="badge bg-warning text-dark me-3">Pending: <span id="pendingCount"><?= $pending_count ?></span></span>
+                    <span id="statusDisplay" class="badge bg-secondary me-3">Status: <?= ucfirst(htmlspecialchars($route_status)) ?></span>
+                    <?php if ($route_distance !== null): ?>
+                        <span class="badge bg-info text-dark me-3">Distance: <?= round($route_distance, 1) ?> km</span>
+                    <?php endif; ?>
+                    <?php if ($route_time !== null): ?>
+                        <span class="badge bg-info text-dark me-3">Est. Time: <?= htmlspecialchars($route_time) ?></span>
+                    <?php endif; ?>
                 </div>
 
-                <div class="col-lg-5">
+                <div class="route-actions">
+                    <button id="startRouteBtn" class="btn btn-success me-2" 
+                        onclick="updateRouteStatus('active', this)" 
+                        <?= $route_status !== 'pending' ? 'disabled' : '' ?>>
+                        <i class="bi bi-play-circle"></i> Start Route
+                    </button>
+                    <button id="completeRouteBtn" class="btn btn-danger" 
+                        onclick="updateRouteStatus('completed', this)" 
+                        <?= $route_status !== 'active' || !$all_collected ? 'disabled' : '' ?>>
+                        <i class="bi bi-stop-circle"></i> Complete Route
+                    </button>
+                </div>
+            </div>
+
+            <div class="row g-4 mb-4">
+                
+                <div class="col-12">
                     <div class="custom-card p-0 bg-white shadow-sm" id="binListContainer">
                         <ul class="list-group list-group-flush" id="routeBinList">
                             <?php if (empty($bins_data)): ?>
@@ -168,14 +237,10 @@ foreach ($route_bins as $rb) {
                                     $fill_level_text = $b['fill_percent'] !== null ? round($b['fill_percent'])."%" : "N/A";
                                     $fill_bar_style = $b['fill_percent'] !== null ? "width: {$b['fill_percent']}%;" : "width: 0;";
                                     $alert_count = count($b['alerts']);
-                                    // Corrected Google Maps Navigation URL format
-                                    $map_nav_url = 'https://www.google.com/maps/dir/?api=1&destination=' . $b['latitude'] . ',' . $b['longitude'];
                                 ?>
                                 <li class="list-group-item bin-list-card <?= $b['is_collected'] ? 'bin-collected' : '' ?>" 
                                     data-bin-id="<?= $b['id'] ?>"
-                                    data-lat="<?= $b['latitude'] ?>"
-                                    data-lng="<?= $b['longitude'] ?>"
-                                    onclick="zoomToBin(this)">
+                                    data-is-collected="<?= $b['is_collected'] ? 'true' : 'false' ?>">
                                     <div class="d-flex w-100 justify-content-between align-items-center">
                                         <h6 class="mb-1 fw-bold"><?= $b['code'] ?></h6>
                                         <div class="bin-status-cell">
@@ -203,18 +268,15 @@ foreach ($route_bins as $rb) {
                                     </div>
 
                                     <div class="bin-action-cell mt-2 d-flex justify-content-end">
-                                        <a href="<?= htmlspecialchars($map_nav_url) ?>" 
-                                            target="_blank" class="btn btn-sm btn-outline-info me-2">
-                                            <i class="bi bi-geo-alt"></i> Navigate
-                                        </a>
-
                                         <?php if (!$b['is_collected']): ?>
                                             <button class="btn btn-sm btn-primary btn-collect me-2"
-                                                             onclick="collectBin('<?= $b['id'] ?>', this); event.stopPropagation();">
+                                                            onclick="collectBin('<?= $b['id'] ?>', this);"
+                                                            <?= $route_status !== 'active' ? 'disabled' : '' ?>>
                                                 <i class="bi bi-check-lg"></i> Collected
                                             </button>
                                             <button class="btn btn-sm btn-outline-danger btn-report"
-                                                             onclick="reportIssue('<?= $b['id'] ?>'); event.stopPropagation();">
+                                                            onclick="reportIssue('<?= $b['id'] ?>');"
+                                                            <?= $route_status !== 'active' ? 'disabled' : '' ?>>
                                                 <i class="bi bi-flag"></i> Report
                                             </button>
                                         <?php else: ?>
@@ -251,7 +313,10 @@ foreach ($route_bins as $rb) {
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
-    // Helper function to show the custom modal
+    const ROUTE_ID = document.getElementById('routeId').value;
+    const INITIAL_STATUS = document.getElementById('initialStatus').value;
+    
+    // --- UTILITY FUNCTIONS ---
     function showCustomAlert(title, message) {
         document.getElementById('customAlertModalLabel').innerText = title;
         document.getElementById('alertModalBody').innerHTML = message;
@@ -259,170 +324,205 @@ foreach ($route_bins as $rb) {
         modal.show();
     }
     
-    // COLLECT BIN ACTION (Updated to use relative path and update UI instantly)
+    function updatePendingCount(change) {
+        const pendingElement = document.getElementById('pendingCount');
+        let currentPending = parseInt(pendingElement.innerText);
+        if (!isNaN(currentPending)) {
+            const newCount = Math.max(0, currentPending + change);
+            pendingElement.innerText = newCount;
+            checkCompletionStatus(newCount);
+        }
+    }
+    
+    // updateMapMarker function removed
+
+    function updateListButtons(listItem, isCollected) {
+        const actionCell = listItem.querySelector('.bin-action-cell');
+        
+        // 1. Update List Item Class
+        if (isCollected) {
+            listItem.classList.add('bin-collected');
+            listItem.dataset.isCollected = 'true';
+        } else {
+             listItem.classList.remove('bin-collected');
+             listItem.dataset.isCollected = 'false';
+        }
+
+        // 2. Update Status Badge
+        const statusCell = listItem.querySelector('.bin-status-cell');
+        statusCell.innerHTML = isCollected 
+            ? '<span class="badge bg-success status-badge"><i class="bi bi-check-lg"></i> Collected</span>'
+            : '<span class="badge bg-warning text-dark status-badge">Pending</span>';
+
+        // 3. Update Action Buttons
+        actionCell.innerHTML = ''; // Clear action cell
+
+        if (isCollected) {
+            actionCell.innerHTML += '<button class="btn btn-sm btn-success" disabled><i class="bi bi-check-all"></i> Done</button>';
+        } else if (document.getElementById('initialStatus').value === 'active') {
+             actionCell.innerHTML += `
+                <button class="btn btn-sm btn-primary btn-collect me-2" onclick="collectBin('${listItem.dataset.binId}', this);">
+                    <i class="bi bi-check-lg"></i> Collected
+                </button>
+                <button class="btn btn-sm btn-outline-danger btn-report" onclick="reportIssue('${listItem.dataset.binId}');">
+                    <i class="bi bi-flag"></i> Report
+                </button>
+             `;
+        }
+    }
+
+    function updateRouteUI(newStatus) {
+        const statusDisplay = document.getElementById('statusDisplay');
+        const startBtn = document.getElementById('startRouteBtn');
+        const completeBtn = document.getElementById('completeRouteBtn');
+        const collectBtns = document.querySelectorAll('.btn-collect, .btn-report');
+        const pendingCount = parseInt(document.getElementById('pendingCount').innerText);
+        
+        // Update status badge
+        statusDisplay.innerText = 'Status: ' + newStatus.charAt(0).toUpperCase() + newStatus.slice(1);
+        statusDisplay.className = `badge ${newStatus === 'active' ? 'bg-success' : (newStatus === 'completed' ? 'bg-dark' : 'bg-secondary')} me-3`;
+        
+        // Update route buttons
+        startBtn.disabled = newStatus !== 'pending';
+        completeBtn.disabled = newStatus !== 'active' || pendingCount > 0;
+        
+        // Enable/Disable bin action buttons
+        collectBtns.forEach(btn => {
+            const listItem = btn.closest('li');
+            if (listItem && listItem.dataset.isCollected === 'false') {
+                 btn.disabled = newStatus !== 'active';
+            } else if (listItem && listItem.dataset.isCollected === 'true' && newStatus === 'active') {
+                updateListButtons(listItem, true); 
+            }
+        });
+
+        // Set the current status for logic checks
+        document.getElementById('initialStatus').value = newStatus;
+    }
+    
+    function checkCompletionStatus(newPendingCount) {
+        const completeBtn = document.getElementById('completeRouteBtn');
+        const currentStatus = document.getElementById('initialStatus').value;
+        const totalBins = <?= count($bins_data) ?>;
+        
+        if (totalBins > 0 && newPendingCount === 0 && currentStatus === 'active') {
+             completeBtn.disabled = false;
+             showCustomAlert("Route Ready! 🎉", "All bins collected! You can now complete the route.");
+        } else {
+             completeBtn.disabled = true;
+        }
+    }
+
+    // --- AJAX ACTIONS ---
+
+    // 1. COLLECT BIN
     function collectBin(binId, buttonElement) {
-        // Find the parent list item (li)
         const listItem = buttonElement.closest('li');
         buttonElement.disabled = true;
         
+        // Ensure ROUTE_ID is included in the payload
+        const payload = `action=collect&bin_id=${binId}&collector_id=${<?= json_encode($collector_id) ?>}&route_id=${ROUTE_ID}`;
+
         fetch("collector_actions.php", { 
             method: "POST",
             headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body: `action=collect&bin_id=${binId}`
+            body: payload
         })
         .then(res => res.json())
         .then(data => {
             if (data.success) {
-                // UI Update Success
-                listItem.classList.add('bin-collected');
-
-                // Update Status Badge
-                const statusCell = listItem.querySelector('.bin-status-cell');
-                if (statusCell) {
-                    statusCell.innerHTML = '<span class="badge bg-success status-badge"><i class="bi bi-check-lg"></i> Collected</span>';
-                }
-
-                // Replace Action Buttons
-                const actionCell = listItem.querySelector('.bin-action-cell');
-                if (actionCell) {
-                    actionCell.innerHTML = '<button class="btn btn-sm btn-success" disabled><i class="bi bi-check-all"></i> Done</button>';
-                }
-                
-                // Update Pending Count
-                const pendingElement = document.getElementById('pendingCount');
-                let currentPending = parseInt(pendingElement.innerText);
-                if (!isNaN(currentPending) && currentPending > 0) {
-                    pendingElement.innerText = currentPending - 1;
-                }
-                
-                showCustomAlert("Collection Success", "Bin " + binId + " marked as collected!");
-
+                updateListButtons(listItem, true);
+                updatePendingCount(-1);
+                // updateMapMarker(binId, 'collected'); // Removed map call
+                showCustomAlert("Collection Success ✅", "Bin **" + binId + "** marked as collected!");
             } else {
                 buttonElement.disabled = false;
-                showCustomAlert("Collection Error", data.message || "Error marking bin as collected.");
+                showCustomAlert("Collection Error ❌", data.message || "Error marking bin as collected.");
             }
         })
         .catch(error => {
             buttonElement.disabled = false;
-            showCustomAlert("Network Error", "Could not connect to the server.");
+            showCustomAlert("Network Error 🌐", "Could not connect to the server.");
             console.error('Error:', error);
         });
     }
 
-    // REPORT ISSUE ACTION (Remains same)
+    // 2. REPORT ISSUE
     function reportIssue(binId) {
-        if (!confirm("Are you sure you want to report an issue for this bin (e.g., damage)?")) {
-            return;
-        }
+        const issue = prompt("Please enter a brief description of the issue for Bin " + binId + ":");
+        if (!issue) return;
+
+        // Ensure ROUTE_ID is included in the payload
+        const payload = `action=report&bin_id=${binId}&issue=${encodeURIComponent(issue)}&route_id=${ROUTE_ID}`;
 
         fetch("collector_actions.php", { 
             method: "POST",
             headers: {"Content-Type": "application/x-www-form-urlencoded"},
-            body: `action=report&bin_id=${binId}`
+            body: payload
         })
         .then(res => res.json())
         .then(data => {
             if (data.success) {
-                showCustomAlert("Report Sent", "Issue reported successfully. Management has been notified.");
+                // updateMapMarker(binId, 'alert'); // Removed map call
+                showCustomAlert("Report Sent 📢", `Issue reported for Bin **${binId}**. Management has been notified.`);
             } else {
-                showCustomAlert("Report Error", data.message || "Error reporting issue.");
+                showCustomAlert("Report Error ❌", data.message || "Error reporting issue.");
             }
         })
         .catch(error => {
-            showCustomAlert("Network Error", "Could not connect to the server to report issue.");
+            showCustomAlert("Network Error 🌐", "Could not connect to the server to report issue.");
             console.error('Error:', error);
         });
     }
-    
-    // Function to zoom the map when a list item is clicked
-    let map = null; // Declare map globally for zoomToBin
-    function zoomToBin(listItem) {
-        if (!map) return;
-        const lat = parseFloat(listItem.dataset.lat);
-        const lng = parseFloat(listItem.dataset.lng);
 
-        if (!isNaN(lat) && !isNaN(lng)) {
-            map.setView([lat, lng], 17); // Zoom level 17 is usually good for street level
-        }
-    }
-    </script>
-
-
-    <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const mapElement = document.getElementById('routeMap');
-        
-        if (!mapElement) return;
-
-        // Initialize Leaflet map (assign to global map variable)
-        map = L.map('routeMap'); 
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19,
-            attribution: '© OpenStreetMap contributors'
-        }).addTo(map);
-
-        const bins = <?php echo json_encode($bins_data); ?>;
-        const markers = [];
-
-        bins.forEach(bin => {
-            if (!bin.location_coords) return; 
-            const coords = bin.location_coords.split(',');
-            
-            if (coords.length !== 2 || isNaN(Number(coords[0])) || isNaN(Number(coords[1]))) return;
-            
-            const [lat, lng] = coords.map(Number); 
-            
-            // Map marker color logic
-            let color = '#007bff'; // Blue for Pending
-            if (bin.is_collected) {
-                color = '#28a745'; // Green for Collected
-            } else if (bin.alerts.length) {
-                color = '#dc3545'; // Red for ALERT
+    // 3. UPDATE ROUTE STATUS (Start/Complete)
+    function updateRouteStatus(newStatus, buttonElement) {
+        if (newStatus === 'completed') {
+            if (!confirm("Are you sure you want to COMPLETE this route? All pending bins will be marked as skipped.")) {
+                return;
             }
-            
-            const statusText = bin.is_collected ? 'Collected' : (bin.alerts.length ? 'ALERT' : 'Pending');
-            // Check for built-in round function availability (optional, use Math.round if needed)
-            const round = window.round || Math.round; 
-            const fillPercent = bin.fill_percent !== null ? round(bin.fill_percent) + '%' : 'N/A';
-            const weightText = bin.weight !== null ? round(bin.weight, 1) + ' kg' : 'N/A';
-            // Corrected Google Maps Navigation URL format
-            const mapNavUrl = 'https://www.google.com/maps/dir/?api=1&destination=' + lat + ',' + lng;
-
-
-            const marker = L.circleMarker([lat, lng], {
-                radius: 8,
-                color: color,
-                fillColor: color,
-                fillOpacity: 0.8
-            }).addTo(map);
-
-            marker.bindPopup(`
-                <div class="fw-bold">${bin.code} (${bin.location_name})</div>
-                <div>Fill Level: ${fillPercent}</div>
-                <div>Weight: ${weightText}</div>
-                <div>Status: <span style="color: ${color};">${statusText}</span></div>
-                <div>Alerts: ${bin.alerts.length || '-'}</div>
-                <a href="${mapNavUrl}" target="_blank" class="btn btn-sm btn-outline-info mt-2">Navigate (Google Maps)</a>
-            `);
-
-            markers.push(marker);
-        });
-
-        // Fit map bounds to markers
-        if (markers.length) {
-            const group = L.featureGroup(markers);
-            map.fitBounds(group.getBounds().pad(0.2));
-        } else {
-            // Set default view if no markers
-            map.setView([14.5995, 120.9842], 12); // Default to Manila center
         }
         
-        // CRITICAL FIX: Invalidate map size after layout settles - INCREASED DELAY
-        // The white screen issue is almost always resolved by ensuring the map container 
-        // has its correct dimensions when Leaflet initializes and/or calls invalidateSize().
-        setTimeout(function() {
-            map.invalidateSize();
-        }, **1000**); // Increased from 500ms to 1000ms for robustness
+        buttonElement.disabled = true;
+
+        fetch("collector_actions.php", { 
+            method: "POST",
+            headers: {"Content-Type": "application/x-www-form-urlencoded"},
+            body: `action=update_route_status&route_id=${ROUTE_ID}&status=${newStatus}`
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                updateRouteUI(newStatus);
+                showCustomAlert("Route Status Updated 🚦", data.message);
+                if (newStatus === 'completed') {
+                    // Force disable all bin buttons when completed
+                    document.querySelectorAll('.btn-collect, .btn-report').forEach(btn => btn.disabled = true);
+                }
+            } else {
+                 showCustomAlert("Route Update Error ❌", data.message || "Error updating route status.");
+            }
+        })
+        .catch(error => {
+            showCustomAlert("Network Error 🌐", "Could not connect to the server.");
+            console.error('Error:', error);
+        })
+        .finally(() => {
+            const pendingCount = parseInt(document.getElementById('pendingCount').innerText);
+            checkCompletionStatus(pendingCount);
+            if (document.getElementById('initialStatus').value !== newStatus) {
+                 buttonElement.disabled = false; 
+            }
+        });
+    }
+
+    // Leaflet map initialization section (map, binMarkers, zoomToBin) removed
+
+    document.addEventListener('DOMContentLoaded', function() {
+        // Map related checks and initializations removed
+        
+        // Initial check for completion button state
+        checkCompletionStatus(parseInt(document.getElementById('pendingCount').innerText));
     });
     </script>
 </body>

@@ -66,4 +66,60 @@ function supabase_insert($table, $data) {
     return json_decode($response, true);
 }
 
+// --- REQUIRED: Add this function to your global utility/config file (e.g., config.php) ---
+if (!function_exists('supabase_action')) {
+    function supabase_action($method, $table, $query_or_body, $user_jwt = null) {
+        if (!defined('SUPABASE_URL') || !defined('SUPABASE_KEY')) return ['error' => 'Supabase configuration missing.'];
+
+        // Determine URL and headers
+        $url = SUPABASE_URL . '/rest/v1/' . $table;
+        $headers = [
+            'apikey: ' . SUPABASE_KEY,
+            'Authorization: Bearer ' . ($user_jwt ?? SUPABASE_KEY),
+            'Accept: application/json'
+        ];
+        
+        $ch = curl_init();
+
+        if ($method === 'POST') {
+            curl_setopt($ch, CURLOPT_URL, $url);
+            curl_setopt($ch, CURLOPT_POST, 1);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $query_or_body);
+            $headers[] = 'Content-Type: application/json';
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        } elseif ($method === 'PATCH' || $method === 'DELETE') {
+            // $query_or_body holds the WHERE clause for DELETE/PATCH
+            $url .= $query_or_body; 
+            curl_setopt($ch, CURLOPT_URL, $url);
+            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
+            
+            if ($method === 'PATCH') {
+                curl_setopt($ch, CURLOPT_POSTFIELDS, $_POST['data_json'] ?? '{}'); // Use passed JSON body
+                $headers[] = 'Content-Type: application/json';
+            }
+            // For both, add the Prefer header to return minimal response
+            $headers[] = 'Prefer: return=minimal';
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        } else {
+            return ['error' => 'Invalid method specified for supabase_action.'];
+        }
+
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        $resp = curl_exec($ch);
+        $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($http_code >= 400 || $http_code === 0) {
+            $error_details = json_decode($resp, true)['message'] ?? $resp;
+            return ['error' => "API Error ($http_code): " . ($error_details ? htmlspecialchars($error_details) : 'Unknown error')];
+        }
+        // Success codes for CUD are typically 201 (POST) or 204 (PATCH/DELETE)
+        if ($http_code >= 200 && $http_code < 300) {
+            return ['success' => true];
+        }
+        
+        return json_decode($resp, true);
+    }
+}
+
 ?>
