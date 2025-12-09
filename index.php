@@ -234,57 +234,57 @@ include 'includes/home/navbar.php';
     </section>
 
     <section id="team" class="py-5 bg-white">
-        <div class="container px-4 px-lg-5">
-            <h2 class="section-heading text-center mb-5">Meet **ISsential TechHive**</h2>
-            <div class="row gx-4 gx-lg-5 justify-content-center">
-                <div class="col-lg-3 col-md-6 mb-4">
-                    <div class="card team-card h-100 shadow-sm border-0 text-center">
-                        <div class="card-body p-4">
-                            <i class="bi bi-person-circle icon-xl text-secondary mb-3"></i>
-                            <h5 class="card-title fw-bold">Roxas, Renalyn</h5>
-                            <p class="card-text text-primary">Project Manager</p>
-                        </div>
+    <div class="container px-4 px-lg-5">
+        <h2 class="section-heading text-center mb-5">Meet **ISsential TechHive**</h2>
+        <div class="row gx-4 gx-lg-5 justify-content-center">
+            <div class="col-lg-3 col-md-6 mb-4">
+                <div class="card team-card h-100 shadow-sm border-0 text-center">
+                    <div class="card-body p-4">
+                        <img src="assets/img/team/roxas.jpg" alt="Roxas, Renalyn" class="team-photo mb-3 rounded-circle border border-primary border-3">
+                        <h5 class="card-title fw-bold">Roxas, Renalyn</h5>
+                        <p class="card-text text-primary">Project Manager</p>
                     </div>
                 </div>
-                <div class="col-lg-3 col-md-6 mb-4">
-                    <div class="card team-card h-100 shadow-sm border-0 text-center">
-                        <div class="card-body p-4">
-                            <i class="bi bi-person-circle icon-xl text-secondary mb-3"></i>
-                            <h5 class="card-title fw-bold">Antang, Sandree</h5>
-                            <p class="card-text text-primary">Researcher / Back-End Developer</p>
-                        </div>
+            </div>
+            <div class="col-lg-3 col-md-6 mb-4">
+                <div class="card team-card h-100 shadow-sm border-0 text-center">
+                    <div class="card-body p-4">
+                        <img src="assets/img/team/dree.jpg" alt="Antang, Sandree" class="team-photo mb-3 rounded-circle border border-primary border-3">
+                        <h5 class="card-title fw-bold">Antang, Sandree</h5>
+                        <p class="card-text text-primary">Full Stack Developer </p>
                     </div>
                 </div>
-                <div class="col-lg-3 col-md-6 mb-4">
-                    <div class="card team-card h-100 shadow-sm border-0 text-center">
-                        <div class="card-body p-4">
-                            <i class="bi bi-person-circle icon-xl text-secondary mb-3"></i>
-                            <h5 class="card-title fw-bold">Aquino, John Benedict</h5>
-                            <p class="card-text text-primary">Back-End & Front-End Developer</p>
-                        </div>
+            </div>
+            <div class="col-lg-3 col-md-6 mb-4">
+                <div class="card team-card h-100 shadow-sm border-0 text-center">
+                    <div class="card-body p-4">
+                        <img src="assets/img/team/aquino_jb.jpg" alt="Aquino, John Benedict" class="team-photo mb-3 rounded-circle border border-primary border-3">
+                        <h5 class="card-title fw-bold">Aquino, John Benedict</h5>
+                        <p class="card-text text-primary">Researcher</p>
                     </div>
                 </div>
-                <div class="col-lg-3 col-md-6 mb-4">
-                    <div class="card team-card h-100 shadow-sm border-0 text-center">
-                        <div class="card-body p-4">
-                            <i class="bi bi-person-circle icon-xl text-secondary mb-3"></i>
-                            <h5 class="card-title fw-bold">Dueñas, Jan Mishael</h5>
-                            <p class="card-text text-primary">Researcher / System Analyst / Back-End Developer</p>
-                        </div>
+            </div>
+            <div class="col-lg-3 col-md-6 mb-4">
+                <div class="card team-card h-100 shadow-sm border-0 text-center">
+                    <div class="card-body p-4">
+                        <img src="assets/img/team/mishs.jpg" alt="Dueñas, Jan Mishael" class="team-photo mb-3 rounded-circle border border-primary border-3">
+                        <h5 class="card-title fw-bold">Dueñas, Jan Mishael</h5>
+                        <p class="card-text text-primary">Researcher / System Analyst </p>
                     </div>
                 </div>
-                <div class="col-lg-3 col-md-6 mb-4">
-                    <div class="card team-card h-100 shadow-sm border-0 text-center">
-                        <div class="card-body p-4">
-                            <i class="bi bi-person-circle icon-xl text-secondary mb-3"></i>
-                            <h5 class="card-title fw-bold">Mirafuente, Mary May</h5>
-                            <p class="card-text text-primary">Researcher / UI Designer</p>
-                        </div>
+            </div>
+            <div class="col-lg-3 col-md-6 mb-4">
+                <div class="card team-card h-100 shadow-sm border-0 text-center">
+                    <div class="card-body p-4">
+                        <img src="assets/img/team/mary.jpg" alt="Mirafuente, Mary May" class="team-photo mb-3 rounded-circle border border-primary border-3">
+                        <h5 class="card-title fw-bold">Mirafuente, Mary May</h5>
+                        <p class="card-text text-primary">Researcher / IoT Development</p>
                     </div>
                 </div>
             </div>
         </div>
-    </section>
+    </div>
+</section>
 
     <footer class="py-4 bg-primary">
         <div class="container px-4 px-lg-5">
