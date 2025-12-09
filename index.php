@@ -241,6 +241,15 @@ include 'includes/home/navbar.php';
                     <div class="card team-card h-100 shadow-sm border-0 text-center">
                         <div class="card-body p-4">
                             <i class="bi bi-person-circle icon-xl text-secondary mb-3"></i>
+                            <h5 class="card-title fw-bold">Roxas, Renalyn</h5>
+                            <p class="card-text text-primary">Project Manager</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6 mb-4">
+                    <div class="card team-card h-100 shadow-sm border-0 text-center">
+                        <div class="card-body p-4">
+                            <i class="bi bi-person-circle icon-xl text-secondary mb-3"></i>
                             <h5 class="card-title fw-bold">Antang, Sandree</h5>
                             <p class="card-text text-primary">Researcher / Back-End Developer</p>
                         </div>

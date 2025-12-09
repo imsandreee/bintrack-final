@@ -6,7 +6,11 @@ $email = $_POST['email'] ?? '';
 $password = $_POST['password'] ?? '';
 
 if (!$email || !$password) {
-    die("Email and password are required.");
+    // Set an error message and redirect
+    $_SESSION['message'] = "Email and password are required.";
+    $_SESSION['message_type'] = 'danger';
+    header("Location: index.php");
+    exit;
 }
 
 // -------------------
@@ -30,7 +34,12 @@ curl_close($ch);
 $data = json_decode($response, true);
 
 if (!isset($data['user']['id'])) {
-    die("Login failed: " . ($data['error_description'] ?? 'Invalid credentials'));
+    // Set an error message and redirect
+    $error_msg = $data['error_description'] ?? 'Invalid credentials';
+    $_SESSION['message'] = "Login failed: " . $error_msg;
+    $_SESSION['message_type'] = 'danger';
+    header("Location: index.php");
+    exit;
 }
 
 $user_id = $data['user']['id'];
@@ -53,7 +62,11 @@ $profiles = json_decode($profile_resp, true);
 $profile = $profiles[0] ?? null;
 
 if (!$profile) {
-    die("Profile not found for this user.");
+    // Set an error message and redirect
+    $_SESSION['message'] = "Login failed: Profile not found for this user.";
+    $_SESSION['message_type'] = 'danger';
+    header("Location: index.php");
+    exit;
 }
 
 // -------------------
@@ -63,12 +76,14 @@ $_SESSION['user'] = [
     'id' => $profile['id'],
     'full_name' => $profile['full_name'],
     'role' => $profile['role'],
-    'email_address' => $profile['email_address']
+    // NOTE: 'email_address' is preferred for the profile table in the original code
+    'email_address' => $profile['email_address'] 
 ];
 
 // -------------------
 // Step 4: Redirect based on role
 // -------------------
+// No need for a session message on success, as they are redirected away from index.php
 switch ($profile['role']) {
     case 'admin':
         header("Location: ../admin/dashboard.php");

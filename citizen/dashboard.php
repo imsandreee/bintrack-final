@@ -8,46 +8,153 @@ if (!isset($_SESSION['user']) || $_SESSION['user']['role'] != 'citizen') {
 }
 
 // FIX: Load configuration and Supabase API functions
-// require_once '../auth/config.php'; 
-// require_once '../auth/supabase_utils.php'; 
+require_once '../auth/config.php'; 
+require_once '../auth/supabase_utils.php'; 
 
 $user = $_SESSION['user'];
-// Assume user profile contains a location/area ID to filter bins
-$user_area_id = $user['area_id'] ?? 'default_area_uuid'; 
+// CRITICAL FIX: Assuming 'area_id' is fetched from the user's profile upon login,
+// or defaulted to a value representing their assigned area (e.g., a city/barangay UUID).
+$user_area_id = $user['area_id'] ?? '00000000-0000-0000-0000-000000000000'; 
+$user_id = $user['id']; // Get the user's UUID from the session
+
+// Define a constant for fill level calculation. This should match the bin specs.
+$MAX_BIN_HEIGHT_CM = 100; // Assuming 100cm total height for calculation
+
+// --- ACTUAL DATA FETCHING (REPLACING SIMULATED DATA) ---
+
+// 1. Total, Almost Full, and Critical Alerts Counts
+// NOTE: These queries assume the 'bins' table has an 'area_id' column for filtering.
+
+// Total Bins nearby
+$total_bins_data = supabase_raw_sql("SELECT COUNT(*) as count FROM bins WHERE area_id = ?", [$user_area_id]);
+$total_bins = $total_bins_data['count'] ?? 0;
+
+// Almost Full Alerts (Alert type 'nearly_full' and unresolved)
+$almost_full_data = supabase_raw_sql("
+    SELECT COUNT(*) as count 
+    FROM bin_alerts 
+    WHERE alert_type = 'nearly_full' 
+      AND resolved = FALSE 
+      AND bin_id IN (SELECT id FROM bins WHERE area_id = ?)
+", [$user_area_id]);
+$almost_full_count = $almost_full_data['count'] ?? 0;
+
+// Critical Alerts (Alert types 'full', 'sensor_error', 'overload' and unresolved)
+$critical_alerts_data = supabase_raw_sql("
+    SELECT COUNT(*) as count 
+    FROM bin_alerts 
+    WHERE alert_type IN ('full', 'sensor_error', 'overload') 
+      AND resolved = FALSE 
+      AND bin_id IN (SELECT id FROM bins WHERE area_id = ?)
+", [$user_area_id]);
+$critical_alerts_count = $critical_alerts_data['count'] ?? 0;
 
 
-// --- SIMULATED DATA FETCHING ---
-// Replace this block with actual supabase_fetch() calls later.
-$local_stats = [
-    'total_bins' => 12,
-    'almost_full_count' => 3,
-    'critical_alerts_count' => 1,
-    'nearest_bin' => [
-        'id' => 'BIN-007',
-        'location' => '123 Oak Street, City Park Entrance',
-        'fill_level' => 78, // %
-        'weight_kg' => 8.2,
-        'last_collected_at' => '2 days ago'
-    ],
-    'next_collection' => [
-        'route_name' => 'Main Street Route',
-        'time' => 'Tomorrow, 9:00 AM',
-        'status' => 'Scheduled'
-    ],
-    'last_reported' => 'In Progress' // Status of the citizen's last report
+// 2. Nearest Bin Status
+// A. Find the nearest bin (simplification: fetch the bin with the most recent communication in the area)
+// In a real app, this would use a complex geo-query (Haversine formula) based on user location.
+$nearest_bin_data_raw = supabase_fetch_one(
+    "bins", 
+    ['area_id' => $user_area_id], // Filter by user's area
+    'last_communication DESC' // Order by most recent communication time
+);
+$nearest_bin_uuid = $nearest_bin_data_raw['id'] ?? null;
+
+// Fallback if no bin is found in the area
+if (!$nearest_bin_uuid) {
+    // Set fallback variables to prevent errors in the HTML
+    $nearest_bin = [
+        'id' => 'N/A',
+        'location' => 'No Bins Found Nearby',
+        'fill_level' => 0, 
+        'weight_kg' => 0.0,
+        'last_collected_at' => 'Never',
+        'lat' => 14.5995, // Default Manila coordinates
+        'lng' => 120.9842,
+    ];
+    // Set $fill_level to 0 for the progress bar logic below
+    $fill_level = 0; 
+} else {
+    // B. Fetch Latest Sensor Reading for the nearest bin
+    $latest_reading = supabase_fetch_one(
+        "sensor_readings", 
+        ['bin_id' => $nearest_bin_uuid], 
+        'timestamp DESC' // Get the latest reading
+    );
+
+    // C. Fetch Last Collection Log
+    $last_collection = supabase_fetch_one(
+        "collection_logs", 
+        ['bin_id' => $nearest_bin_uuid], 
+        'collected_at DESC'
+    );
+    
+    // --- FILL LEVEL CALCULATION ---
+    $distance_cm = $latest_reading['ultrasonic_distance_cm'] ?? $MAX_BIN_HEIGHT_CM; 
+    
+    // Fill Level % = 100 - ((Distance from sensor / Max Height) * 100)
+    $fill_level = round(100 - ($distance_cm / $MAX_BIN_HEIGHT_CM) * 100) ?? 0; 
+    // Ensure fill level is capped between 0 and 100
+    $fill_level = max(0, min(100, $fill_level));
+
+    $weight_kg = $latest_reading['load_cell_weight_kg'] ?? 0.0;
+
+    $nearest_bin = [
+        'id' => $nearest_bin_data_raw['bin_code'],
+        'uuid' => $nearest_bin_uuid,
+        'location' => $nearest_bin_data_raw['location_name'],
+        'fill_level' => $fill_level, 
+        'weight_kg' => $weight_kg,
+        // Use time ago helper on the collection log time, or communication time if no log
+        'last_collected_at' => supabase_time_ago($last_collection['collected_at'] ?? $nearest_bin_data_raw['last_communication'] ?? null),
+        'lat' => $nearest_bin_data_raw['latitude'],
+        'lng' => $nearest_bin_data_raw['longitude'],
+    ];
+}
+
+
+// 3. Next Collection Schedule
+// Finds the next route that includes any bin from the user's area.
+// This requires fetching all bins in the area first, then checking routes against that list.
+
+// Get all bin IDs in the user's area (requires a `supabase_fetch_all` function in utils)
+// $area_bin_ids_raw = supabase_fetch_all("SELECT id FROM bins WHERE area_id = ?", [$user_area_id]);
+// $area_bin_ids = array_column($area_bin_ids_raw, 'id'); 
+// The query below simulates the check for the next scheduled route that affects this area:
+
+// For a complex array comparison query (e.g., PostgreSQL `bin_ids @> ARRAY[...]::uuid[]`), 
+// we use supabase_raw_sql and filter by status and order by creation time.
+$next_collection_data = supabase_raw_sql("
+    SELECT route_name, estimated_time, status 
+    FROM collection_route 
+    WHERE status = 'pending' 
+    ORDER BY created_at ASC 
+    LIMIT 1
+");
+
+$next_collection = [
+    'route_name' => $next_collection_data['route_name'] ?? 'No Route Scheduled',
+    // Use estimated_time + current time to get a future timestamp, then format
+    'time' => supabase_format_time(
+        isset($next_collection_data['estimated_time']) 
+        ? date('Y-m-d H:i:s', strtotime("+" . $next_collection_data['estimated_time'])) 
+        : null
+    ) ?? 'TBD', 
+    'status' => $next_collection_data['status'] ?? 'Scheduled'
 ];
-// --- END SIMULATED DATA ---
 
+// 4. Last Reported Status
+// Get the status of the user's most recent report
+$last_report_data = supabase_fetch_one(
+    "citizen_reports", 
+    ['user_id' => $user_id], 
+    'created_at DESC' // Order by created_at descending
+);
+$last_reported = ucwords(str_replace('_', ' ', $last_report_data['status'] ?? 'None Reported'));
 
-$total_bins = $local_stats['total_bins'];
-$almost_full_count = $local_stats['almost_full_count'];
-$critical_alerts_count = $local_stats['critical_alerts_count'];
-$nearest_bin = $local_stats['nearest_bin'];
-$next_collection = $local_stats['next_collection'];
-$last_reported = $local_stats['last_reported'];
+// --- END ACTUAL DATA FETCHING ---
 
 // Determine progress bar color based on fill level
-$fill_level = $nearest_bin['fill_level'];
 $progress_color = 'bg-success';
 $fill_status_badge = 'bg-success';
 $fill_status_text = 'Low';
@@ -95,9 +202,7 @@ include '../includes/citizen/navbar.php';
 </h4>
                     <p class="mb-0 text-muted">A quick overview of waste collection in your neighborhood.</p>
                 </div>
-                <button class="btn btn-outline-secondary btn-sm d-none d-md-block">
-                    <i class="bi bi-gear me-1"></i> Settings
-                </button>
+                
             </div>
 
             <div class="row g-4 mb-5">
@@ -134,89 +239,10 @@ include '../includes/citizen/navbar.php';
                         </div>
                     </div>
                 </div>
-                <div class="col-sm-6 col-lg-3">
-                    <div class="indicator-card">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h5 class="text-muted mb-0 small text-uppercase">Nearest Bin Status</h5>
-                                <p class="h3 fw-bold text-green mb-0"><?= $nearest_bin['fill_level'] ?>% Full</p>
-                            </div>
-                            <div class="icon"><i class="bi bi-check2-circle"></i></div>
-                        </div>
-                    </div>
-                </div>
+                
             </div>
 
-            <div class="row g-4">
-                <div class="col-lg-8">
-                    <div class="custom-card p-4">
-                        <h5 class="fw-bold mb-3">Nearest Smart Bin Status (Bin ID: #<?= $nearest_bin['id'] ?>)</h5>
-                        <div class="row">
-                            <div class="col-md-6 mb-3 mb-md-0">
-                                <div id="nearestBinMap" class="ratio ratio-16x9 rounded-3 bg-light-green border text-center d-flex align-items-center justify-content-center">
-                                    <p class="text-muted mb-0" id="mapMessage">
-                                        Loading map...
-                                    </p>
-                                </div>
-                                <small class="text-muted mt-2 d-block">Location: <?= htmlspecialchars($nearest_bin['location']) ?></small>
-                            </div>
-                            <div class="col-md-6">
-                                <p class="fw-semibold mb-1">Fill Level: <span class="badge <?= $fill_status_badge ?>"><?= $fill_level ?>% (<?= $fill_status_text ?>)</span></p>
-                                <div class="progress mb-3" style="height: 10px;">
-                                    <div 
-                                        class="progress-bar progress-bar-fill <?= $progress_color ?>" 
-                                        role="progressbar" 
-                                        style="width: <?= $fill_level ?>%" 
-                                        aria-valuenow="<?= $fill_level ?>" 
-                                        aria-valuemin="0" 
-                                        aria-valuemax="100"
-                                    ></div>
-                                </div>
-                                
-                                <p class="fw-semibold mb-1">Weight: <span class="text-dark"><?= $nearest_bin['weight_kg'] ?> kg</span></p>
-                                <p class="fw-semibold mb-1">Last Collection: <span class="text-muted"><?= $nearest_bin['last_collected_at'] ?></span></p>
-
-                                <div class="d-grid gap-2 mt-4">
-                                    <button class="btn btn-primary" onclick="loadPage('binList')">
-                                        <i class="bi bi-binoculars me-2"></i> View All Bins
-                                    </button>
-                                    <button class="btn btn-outline-secondary" onclick="loadPage('reportForm')">
-                                        <i class="bi bi-megaphone me-2"></i> Report an Issue Here
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-lg-4">
-                    <div class="custom-card p-4 h-100">
-                        <h5 class="fw-bold mb-3">Collection Schedule Updates</h5>
-                        <div class="list-group list-group-flush">
-                            <div class="list-group-item d-flex justify-content-between align-items-center">
-                                <div class="me-auto">
-                                    <p class="mb-0 fw-semibold">Next Scheduled Pickup</p>
-                                    <small class="text-muted"><?= $next_collection['route_name'] ?></small>
-                                </div>
-                                <span class="badge bg-info text-dark"><?= $next_collection['time'] ?></span>
-                            </div>
-                            <div class="list-group-item d-flex justify-content-between align-items-center">
-                                <div class="me-auto">
-                                    <p class="mb-0 fw-semibold">Your Last Report</p>
-                                    <small class="text-muted">Status</small>
-                                </div>
-                                <span class="badge bg-primary"><?= $last_reported ?></span>
-                            </div>
-                            <div class="list-group-item d-flex justify-content-between align-items-center">
-                                <div class="me-auto">
-                                    <p class="mb-0 fw-semibold">Service Change Alert</p>
-                                    <small class="text-muted">Holiday delay notice</small>
-                                </div>
-                                <span class="badge bg-danger">NEW</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            
         </section>
     </div>
 
@@ -231,10 +257,10 @@ include '../includes/citizen/navbar.php';
     
     <script>
     // Expose nearest bin coordinates for Leaflet
-    // Since we're using simulated data, let's use a simulated location in Manila
-    const NEAREST_BIN_LAT = 14.6190;
-    const NEAREST_BIN_LNG = 121.0180;
+    const NEAREST_BIN_LAT = <?= $nearest_bin['lat'] ?>;
+    const NEAREST_BIN_LNG = <?= $nearest_bin['lng'] ?>;
     const NEAREST_BIN_ID = '<?= $nearest_bin['id'] ?>';
+    const NEAREST_BIN_FILL = <?= $fill_level ?>;
 
     /**
      * Initializes the Leaflet map for the nearest bin.
@@ -253,7 +279,7 @@ include '../includes/citizen/navbar.php';
 
         // Add a marker for the nearest bin
         L.marker([NEAREST_BIN_LAT, NEAREST_BIN_LNG])
-            .bindPopup(`<b>Bin #${NEAREST_BIN_ID}</b><br>Fill Level: ${<?= $fill_level ?>}%`)
+            .bindPopup(`<b>Bin #${NEAREST_BIN_ID}</b><br>Fill Level: ${NEAREST_BIN_FILL}%`)
             .addTo(map);
 
         // Crucial for map rendering in small containers/after page load

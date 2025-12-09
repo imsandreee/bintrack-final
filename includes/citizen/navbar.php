@@ -11,7 +11,7 @@
         <div class="collapse navbar-collapse" id="navbarNav">
             <ul class="navbar-nav ms-auto">
                 <li class="nav-item"><a class="nav-link active" href="dashboard.php">Dashboard</a></li>
-                <li class="nav-item"><a class="nav-link" href="binList.php">Smart Bins</a></li>
+                <li class="nav-item"><a class="nav-link" href="binlist.php">Smart Bins</a></li>
                 <li class="nav-item"><a class="nav-link" href="reportForm.php">Report Issue</a></li>
             </ul>
 
